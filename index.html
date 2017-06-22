@@ -4,15 +4,15 @@
     <title>Dan's chat app</title>
     <script src="/socket.io/socket.io.js"></script>
     <script
-  src="https://code.jquery.com/jquery-3.2.1.min.js"
-  integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
-  crossorigin="anonymous"></script>
+  src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
     <script>
+
             var socket = io();
             var sessionExists = false;
             var sessionUser = decodeURIComponent(document.cookie);
             if (sessionUser == '') {
                 console.log('no login session');
+                sessionUser = 'Anon';
             }
             else {
                 sessionUser = sessionUser.split('=')[1];
@@ -20,6 +20,7 @@
 
             $(function() {
                 socket.emit('eConnect', sessionUser);
+                $('#userspan').html(sessionUser);
                 $('#asd').submit(function(e) {
                         e.preventDefault();
                         e.stopPropagation();
@@ -30,6 +31,7 @@
                             if (unameCheck(username)) {
                                 document.cookie = 'user=' + username;
                                 socket.emit('userset', username);
+                                $('#userspan').html(username);
                             }
                             else {
                                 systemMessage('Invalid username; usernames can only contain letters and numbers');
@@ -40,26 +42,48 @@
                             console.log(extractUser(messageContent));
                             if(extractUser(messageContent) !== false) {
                                 var processedMsg = extractUser(messageContent);
-                                socket.emit('privmessage', processedMsg[1], processedMsg[0]);
+                                var message = {
+                                    msgtext: processedMsg[1],
+                                    msgfrom: sessionUser,
+                                    msgto: processedMsg[0]
+                                };
+                                socket.emit('newUsermessage', message, true);
                             }
                             else {
                                 systemMessage('Invalid username; usernames can only contain letters and numbers. The correct syntax for private messages is: (private) [Username] Message');
                             }
                         }
                         else {
-                            socket.emit('newmessage', toSubmit);
+                            var message = {
+                                msgtext: toSubmit,
+                                msgfrom: sessionUser,
+                                msgto: 'All'
+                            };
+                            socket.emit('newUsermessage', message, false);
                         }
                     $('#m').val('');
                     return false;
                 });
 
+                socket.on('newUsermessage', function(msg, private) {
+                    userMessage(msg, private);
+                });
+
                 socket.on('newmessage', function(msg) {
                     $('#messages').append($('<li>').text(msg));
-                });
+                })
 
                 socket.on('usernumupdate', function(num) {
                     $('#realcount').html(num);
                     console.log(num);
+                });
+
+                socket.on('systemmsg', function(msg) {
+                    systemMessage(msg);
+                    $('.sysmsg').css({
+                        'background-color' : '#DC7633', 
+                        'color' : 'white'
+                     });
                 });
             });
 
@@ -94,27 +118,42 @@
                 }
             }
 
+            function userMessage(msg, private) {
+                if (private) {
+                    var msgString = '(private) ';
+                    msgString += "'" + msg.msgfrom + "' @ '" + msg.msgto + "': " + msg.msgtext;
+                    $('#messages').append($('<li>').text(msgString).addClass('primessage'));
+                }
+                else {
+                    var msgString = '';
+                    msgString += "'" + msg.msgfrom + "' @ '" + msg.msgto + "': " + msg.msgtext;
+                    $('#messages').append($('<li>').text(msgString).addClass('pubmessage'));
+                }
+            }
+
             function systemMessage(msgtext) {
+                console.log(msgtext);
                 $('#messages').append($('<li>').text('(System Message) ' + msgtext).addClass('sysmsg'));
             }
             
     </script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font: 13px Helvetica, Arial; }
+        body { font: 13px Helvetica, Arial; width: 100%; }
         form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
         form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; }
         form button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
-        .sysmsg { background-color: #DC7633; }
+        .sysmsg { background-color: #DC7633; color: white; }
+        .primessage { background-color:  #AED6F1; color: white; }
         #messages { list-style-type: none; margin: 0; padding: 0; }
-        #messages li { padding: 5px 10px; }
+        #messages li { padding: 11px 20px; font-size: 15pt; color: #707B7C; width: 100%; }
         #messages li:nth-child(odd) { background: #eee; }
         #userCountDiv { margin-top: 860px; width: 100%; height: 40px; background-color: #888888; color: white; font-size: 24px; position: fixed; bottom: 28px;}
     </style>
 </head>
 <body>
     <ul id="messages"></ul>
-    <div id="userCountDiv">Current user count: <span id='realcount'></span></div>
+    <div id="userCountDiv" style="padding-left: 30px;">Users online: <span id='realcount'></span><span style="float: right; padding-right: 30px;">Current user: <span id='userspan'></span></span></div>
     <form id="asd" action="">
         <input id="m" autocomplete="off" /><button id="danb">Send</button>
     </form>
