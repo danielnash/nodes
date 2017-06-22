@@ -22,10 +22,10 @@ io.on('connection', function(socket) {
 
 	socket.on('eConnect', function(userCred) {
 		if (userCred == '') {
-			io.emit('newmessage', 'Anon user just connected!');
+			io.emit('systemmsg', 'Anon user just connected!');
 		}
 		else {
-			io.emit('newmessage', 'Welcome! Username: ' + userCred);
+			io.emit('systemmsg', 'Welcome! Username: ' + userCred);
             client.set(userCred, socket.id, function(err) {
                 if (err) {
                     throw err;
@@ -40,35 +40,37 @@ io.on('connection', function(socket) {
 	socket.on('disconnect', function() {
 		global.count = global.count - 1;
         getUsers();
-		io.emit('newmessage', 'User has disconnected');
+		io.emit('systemmsg', 'User has disconnected');
 	});
 
 	socket.on('userset', function(userCred) {
-		io.emit('newmessage', 'New user set! Username: ' + userCred);
+		io.emit('systemmsg', 'New user set! Username: ' + userCred);
         console.log('User has been set. Socket id: ' + socket.id + ' User id: ' + userCred);
-        client.set(userCred, socket.id, function(err) {
+        if (userCred !== 'Anon') {
+            client.set(userCred, socket.id, function(err) {
                 if (err) {
                     throw err;
                 }
             });
+        }
 	});
 
-	socket.on('newmessage', function(msg) {
-		io.emit('newmessage', msg);
-	});
-
-	socket.on('privmessage', function(msg, user){
-        console.log(user);
-        client.get(user, function(err, socketId) {
-            if (err) {
-                throw err;
-            }
-            io.to(socketId).emit('newmessage', msg);
-            console.log('Message sent: ' + msg);
-        })
-	});	
+	socket.on('newUsermessage', function(msg, private) {
+        if (!private) {
+            io.emit('newUsermessage', msg, private);
+        }
+        else {
+            client.get(msg.msgto, function(err, socketId) {
+                if (err) {
+                    throw err;
+                }
+                io.to(socketId).emit('newUsermessage', msg, private);
+            })
+        }
+    });
 
 });
+
 
 function getUsers() {
     io.emit('usernumupdate', global.count);
