@@ -1,0 +1,123 @@
+<!doctype html>
+<html>
+<head>
+    <title>Dan's chat app</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script
+  src="https://code.jquery.com/jquery-3.2.1.min.js"
+  integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
+  crossorigin="anonymous"></script>
+    <script>
+            var socket = io();
+            var sessionExists = false;
+            var sessionUser = decodeURIComponent(document.cookie);
+            if (sessionUser == '') {
+                console.log('no login session');
+            }
+            else {
+                sessionUser = sessionUser.split('=')[1];
+            }
+
+            $(function() {
+                socket.emit('eConnect', sessionUser);
+                $('#asd').submit(function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        var toSubmit = $('#m').val().trim();
+                        var modifier = toSubmit.substr(0, 9);
+                        if (modifier == '(setuser)') {
+                            var username = toSubmit.substr(10, toSubmit.length - 1);
+                            if (unameCheck(username)) {
+                                document.cookie = 'user=' + username;
+                                socket.emit('userset', username);
+                            }
+                            else {
+                                systemMessage('Invalid username; usernames can only contain letters and numbers');
+                            }
+                        }
+                        else if (modifier == '(private)') {
+                            var messageContent = toSubmit.substr(10, toSubmit.length - 1);
+                            console.log(extractUser(messageContent));
+                            if(extractUser(messageContent) !== false) {
+                                var processedMsg = extractUser(messageContent);
+                                socket.emit('privmessage', processedMsg[1], processedMsg[0]);
+                            }
+                            else {
+                                systemMessage('Invalid username; usernames can only contain letters and numbers. The correct syntax for private messages is: (private) [Username] Message');
+                            }
+                        }
+                        else {
+                            socket.emit('newmessage', toSubmit);
+                        }
+                    $('#m').val('');
+                    return false;
+                });
+
+                socket.on('newmessage', function(msg) {
+                    $('#messages').append($('<li>').text(msg));
+                });
+
+                socket.on('usernumupdate', function(num) {
+                    $('#realcount').html(num);
+                    console.log(num);
+                });
+            });
+
+            function extractUser(mText) {
+                var x = mText.split('[')[1]; 
+                if (typeof x == 'undefined') {
+                    return false;
+                }
+                else {
+                    x = x.split(']');
+                    msg = x[1];
+                    x = x[0];
+                    if (typeof x == 'undefined') {
+                        return false;
+                    }
+                    else if (!(unameCheck(x))) {
+                        return false;
+                    }
+                    else {
+                        return [x, msg];
+                    }
+                }
+            }
+
+            function unameCheck(user) {
+                var nameReg = /^[a-zA-Z0-9\-]+$/;
+                if (nameReg.test(user)) {
+                    return true;
+                }
+                else {
+                    return false;
+                }
+            }
+
+            function systemMessage(msgtext) {
+                $('#messages').append($('<li>').text('(System Message) ' + msgtext).addClass('sysmsg'));
+            }
+            
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font: 13px Helvetica, Arial; }
+        form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
+        form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; }
+        form button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
+        .sysmsg { background-color: #DC7633; }
+        #messages { list-style-type: none; margin: 0; padding: 0; }
+        #messages li { padding: 5px 10px; }
+        #messages li:nth-child(odd) { background: #eee; }
+        #userCountDiv { margin-top: 860px; width: 100%; height: 40px; background-color: #888888; color: white; font-size: 24px; position: fixed; bottom: 28px;}
+    </style>
+</head>
+<body>
+    <ul id="messages"></ul>
+    <div id="userCountDiv">Current user count: <span id='realcount'></span></div>
+    <form id="asd" action="">
+        <input id="m" autocomplete="off" /><button id="danb">Send</button>
+    </form>
+</body>
+</html>
+                
