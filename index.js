@@ -3,12 +3,21 @@ var http = require('http').Server(app);
 var io = require('socket.io')(http);
 var redis = require('redis');
 
+const hostname = 'localhost';
+const portnum = 6379;
+
+
 var client = redis.createClient({
-    host: 'localhost',
-    port: 6379
+    host: hostname,
+    port: portnum
 });
+
 client.on("error", function (err) {
     console.log("Error " + err);
+});
+
+client.on("connect", function() {
+	console.log('Connected to redis server! Host: ' + hostname + ' Port: ' + portnum);
 });
 
 app.get('/', function(req, res){
